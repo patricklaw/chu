@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 
-from distutils.core import setup
+from setuptools import setup
 
 VERSION = '0.0.0'
 DESCRIPTION = 'Tornado Rabbit clients built on Pika'
@@ -30,8 +30,9 @@ setup(
     license='Apache 2',
     author_email='plawson@shopwiki.com',
     url='http://github.com/shopwiki/chu',
-    packages=['zuul'],
-    install_requires=['sqlalchemy'],
+    packages=['chu'],
+    install_requires=['tornado', 'pika', 'simplejson',
+                      'py-bcrypt'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
@@ -39,5 +40,5 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Topic :: Software Development :: Libraries :: Python Modules',
-    ]
+    ],
 )
