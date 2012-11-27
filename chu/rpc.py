@@ -17,20 +17,20 @@
 # limitations under the License.
 #
 
-
-import pika
-import uuid
+from datetime import timedelta
+from functools import partial
 from threading import Lock
 
 from tornado import gen
 from tornado.gen import Task, Callback, Wait
 from tornado.ioloop import IOLoop
 from tornado import stack_context
-from pika.adapters.tornado_connection import TornadoConnection
-import simplejson as json
 
-from datetime import timedelta
-from functools import partial
+import pika
+import uuid
+from pika.adapters.tornado_connection import TornadoConnection
+
+import simplejson as json
 
 import logging
 logger = logging.getLogger(__name__)
@@ -179,8 +179,6 @@ class RPCResponse(object):
 
 
 class AsyncSimpleConsumer(AsyncRabbitConnectionBase):
-    # def __init__(self, *args, **kwargs):
-    #     super(AsyncSimpleConsumer, self).__init__(*args, **kwargs)
     @gen.engine
     def consume_queue(self, queue):
         yield gen.Task(self.basic_consume,
