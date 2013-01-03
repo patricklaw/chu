@@ -5,9 +5,9 @@ from tornado.testing import AsyncTestCase
 import uuid
 import simplejson as json
 from datetime import timedelta
-from kansas.rabbit import AsyncTornadoRPCClient, RPCRequest, RPCTimeoutError
-from kansas.tests.rabbit_worker import Worker
-from kansas.tests.util import gen_wrapper, AsyncEvent
+from chu.rpc import AsyncTornadoRPCClient, RPCRequest, RPCTimeoutError
+from chu.tests.rabbit_worker import Worker
+from chu.tests.util import gen_wrapper, AsyncEvent
 
 from multiprocessing import Process
 from pika.adapters import BlockingConnection

@@ -18,6 +18,8 @@
 #
 
 import pika
+from pika.adapters import TornadoConnection
+import uuid
 from threading import Lock
 
 from tornado import gen

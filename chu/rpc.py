@@ -28,9 +28,10 @@ from tornado import stack_context
 
 import pika
 import uuid
-from pika.adapters.tornado_connection import TornadoConnection
 
 import simplejson as json
+
+from chu.connection import AsyncRabbitConnectionBase
 
 import logging
 logger = logging.getLogger(__name__)
@@ -42,10 +43,8 @@ class RPCTimeoutError(Exception):
     '''
     pass
 
-
 class RPCErrorResponse(object):
     pass
-
 
 class RPCRequest(object):
     '''
@@ -70,7 +69,6 @@ class RPCRequest(object):
             params_hash = hash(self.json_params)
             self._hash = hash((routing_key_hash, params_hash))
         return self._hash
-    
 
 class RPCResponseFuture(object):
     '''
@@ -177,7 +175,6 @@ class RPCResponse(object):
             self._body = json.loads(self.body_json, use_decimal=True)
         return self._body
 
-
 class AsyncSimpleConsumer(AsyncRabbitConnectionBase):
     @gen.engine
     def consume_queue(self, queue):
@@ -188,9 +185,6 @@ class AsyncSimpleConsumer(AsyncRabbitConnectionBase):
     def consume_message(self, channel, method, properties, body):
         raise NotImplemented('consume_message should be implemented '
                              'by subclasses of AsyncSimpleConsumer.')
-
-
-
 
 class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
 
