@@ -93,7 +93,7 @@ autodoc_member_order = "groupwise"
 
 def skip(app, what, name, obj, skip, options):
     if name == "__init__":
-        return False
+        return obj.__doc__ is None
     return skip
 
 def setup(app):
