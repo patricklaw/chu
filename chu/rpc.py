@@ -20,6 +20,8 @@
 from datetime import timedelta
 from functools import partial
 from threading import Lock
+import numbers
+import uuid
 
 from tornado import gen
 from tornado.gen import Task, Callback, Wait
@@ -27,8 +29,6 @@ from tornado.ioloop import IOLoop
 from tornado import stack_context
 
 import pika
-import uuid
-
 import simplejson as json
 
 from chu.connection import AsyncRabbitConnectionBase
@@ -61,6 +61,7 @@ class RPCRequest(object):
         self.routing_key = routing_key
         self.params = params
         self.json_params = json.dumps(params, sort_keys=True)
+        # if timeout is a number, treat it as seconds
         self.timeout = timeout
     
     def __hash__(self):
@@ -106,7 +107,9 @@ class RPCResponseFuture(object):
 
         :param timeout: The amount of time to wait before raising an
             :exc:`RPCTimeoutError` to indicate that the RPC has timed
-            out.
+            out.  This can be a number or a :class:`timedelta`
+            object.  If it is a number, it will be treated as
+            seconds.
         '''
 
         if self.response_received:
@@ -125,6 +128,9 @@ class RPCResponseFuture(object):
             logger.info('Response has not been received yet.  Adding '
                         'timeout to the io_loop in case the response '
                         'times out.')
+
+            if isinstance(timeout, numbers.Real):
+                timeout = timedelta(seconds=timeout)
             self.io_loop.add_timeout(timeout, self.timeout_callback)
 
             logger.info('Waiting for the response.')

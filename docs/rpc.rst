@@ -9,8 +9,22 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 
+.. currentmodule:: chu.rpc
 
-chu
-===
+Asynchronous Rabbit RPC
+=======================
 
-Clients and utilities for using pika/RabbitMQ in Tornado
+.. automodule:: chu.rpc
+
+.. autoclass:: RPCRequest
+
+.. autoclass:: RPCResponseFuture
+    :members:
+
+.. autoclass:: AsyncTornadoRPCClient
+    :members:
+
+
+Exceptions
+~~~~~~~~~~
+.. autoexception:: RPCTimeoutError

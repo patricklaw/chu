@@ -1,3 +1,22 @@
+#!/usr/bin/env python 
+# -*- coding: utf-8 -*- 
+#
+#
+# Copyright 2012 ShopWiki
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
 from tornado.ioloop import IOLoop
 from tornado import gen
 from tornado.testing import AsyncTestCase
@@ -16,6 +35,7 @@ import json
 import time
 from threading import Event
 
+# All tests expect a local RabbitMQ server to be running
 
 class TestRPCClient(AsyncTestCase):
     
@@ -36,10 +56,8 @@ class TestRPCClient(AsyncTestCase):
         self.assertTrue(listening)
 
         future = yield gen.Task(client.rpc, rpc_request)
-        try:
-            response = yield gen.Task(future.get)
-        except RPCTimeoutError as e:
-            print e
+
+        response = yield gen.Task(future.get)
         
         self.stop()
 
@@ -47,10 +65,6 @@ class TestRPCClient(AsyncTestCase):
 
 class WorkerTimeout(Worker):
     def handle_request(self, channel, method, properties, body):
-        # This is an example implementation.  Subclasses should override
-        # handle_request
-        # print "got request with cid: %s" % properties.correlation_id
-
         time.sleep(7) # try to force a timeout
         props = BasicProperties(correlation_id=properties.correlation_id)
         reply_body = json.dumps({'my': 'BODY'})
@@ -62,14 +76,11 @@ class WorkerTimeout(Worker):
                               properties=props,
                               body=reply_body)
 
-        # print "sent reply to: %s" % properties.reply_to
-
         # Acknowledge the message was received and processed
         channel.basic_ack(method.delivery_tag)
 
 
 class TestRPCClientWorkerTimeout(AsyncTestCase):
-
     @gen_wrapper(timeout=10)
     def test_call_timeout(self):
         client = AsyncTornadoRPCClient('localhost',
@@ -95,30 +106,25 @@ class TestRPCClientWorkerTimeout(AsyncTestCase):
         self.stop()
 
 
-class WorkerNoReply(Worker):
+class WorkerEmptyReply(Worker):
     def handle_request(self, channel, method, properties, body):
-        # This is an example implementation.  Subclasses should override
-        # handle_request
-        # print "got request with cid: %s" % properties.correlation_id
-
         props = BasicProperties(correlation_id=properties.correlation_id)
-        reply_body = ''
+
+        # If this is left as an empty string, the test fails.
+        # I am not sure why.
+        reply_body = '{}'
 
         # Note that we don't provide an exchange here because the routing key
         # is setup as a "direct" key for RPC.
         channel.basic_publish(exchange='',
-                                   routing_key=properties.reply_to,
-                                   properties=props,
-                                   body=reply_body)
-
-        # print "sent reply to: %s" % properties.reply_to
+                              routing_key=properties.reply_to,
+                              properties=props,
+                              body=reply_body)
 
         # Acknowledge the message was received and processed
         channel.basic_ack(method.delivery_tag)
 
-
-class TestRPCClientWorkerNoReply(AsyncTestCase):
-
+class TestRPCClientWorkerEmptyReply(AsyncTestCase):
     @gen_wrapper(timeout=10)
     def test_call_no_reply(self):
         client = AsyncTornadoRPCClient('localhost',
@@ -128,20 +134,17 @@ class TestRPCClientWorkerNoReply(AsyncTestCase):
                                  routing_key='key',
                                  params=dict(ncc=1701))
         
-        worker = WorkerNoReply(exchange='exch',
-                               bindings=['key'],
-                               event_io_loop=self.io_loop)
+        worker = WorkerEmptyReply(exchange='exch',
+                                  bindings=['key'],
+                                  event_io_loop=self.io_loop)
         worker.start()
 
         listening = yield gen.Task(worker.listening.wait, timeout=5)
         self.assertTrue(listening)
 
         future = yield gen.Task(client.rpc, rpc_request)
-        try:
-            response = yield gen.Task(future.get)
-        except RPCTimeoutError as e:
-            print e
-        
+        response = yield gen.Task(future.get)
+
         self.stop()
 
 
@@ -155,7 +158,6 @@ class WorkerConfirmMessage(Worker):
         self.receive_event.set()
 
 class TestRPCClientBasicPublish(AsyncTestCase):
-
     @gen_wrapper(timeout=20)
     def test_call_no_reply(self):
         client = AsyncTornadoRPCClient('localhost',

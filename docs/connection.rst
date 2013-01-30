@@ -9,8 +9,10 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 
+.. currentmodule:: chu.connection
 
-chu
-===
+Chu Connection Details
+=======================
 
-Clients and utilities for using pika/RabbitMQ in Tornado
+.. automodule:: chu.connection
+
