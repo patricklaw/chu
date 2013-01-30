@@ -14,5 +14,7 @@
 Chu Connection Details
 =======================
 
+Documentation on how to extend the internal AsyncRabbitConnectionBase class is forthcoming.
+
 .. automodule:: chu.connection
 

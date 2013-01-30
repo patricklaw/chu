@@ -1,4 +1,4 @@
 chu
 ===
 
-Clients and utilities for using pika/RabbitMQ in Tornado
+An asynchronous RabbitMQ RPC client for Python built on top of Pika.

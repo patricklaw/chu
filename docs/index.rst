@@ -20,7 +20,6 @@ Welcome to Chu's documentation!
 Contents:
 
 .. toctree::
-    examples
     rpc
     connection
 
