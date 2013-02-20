@@ -228,7 +228,6 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
             return
 
         try:
-            self.declaring_rpc_queue = True
             self.rpc_queue = yield gen.Task(self.queue_declare,
                                             exclusive=True)
             yield gen.Task(self.basic_consume, queue=self.rpc_queue)
@@ -239,14 +238,19 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
                 cb = self.rpc_queue_callbacks.pop()
                 self.io_loop.add_callback(cb)
             logger.info('Done adding callbacks.')
+
         finally:
             self.declare_rpc_queue_lock.release()
+            callback()
 
     @gen.engine
     def ensure_rpc_queue(self, callback):
         logger.info('Ensuring that an RPC queue has been declared.')
         yield Task(self.ensure_connection)
-        if not self.rpc_queue:
+        if self.rpc_queue:
+            logger.info('The RPC queue is already open.')
+            callback()
+        else:
             logger.info('Adding callback to list of callbacks '
                         'waiting for the RPC queue to be open.')
             callback = stack_context.wrap(callback)
@@ -255,9 +259,7 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
             logger.info('Calling rpc_queue_declare().')
             rpc_queue = yield gen.Task(self.rpc_queue_declare)
             logger.info('rpc_queue_declare has been called.')
-        else:
-            logger.info('The RPC queue is already open.')
-            callback()
+
     
     def rpc_timeout_callback(self, correlation_id):
         logger.info('RPC Client timeout callback called.')
