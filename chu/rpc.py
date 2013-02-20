@@ -117,6 +117,7 @@ class RPCResponseFuture(object):
                         'the value immediately.')
             callback(self.response)
         else:
+            callback = stack_context.wrap(callback)
             if self.timeout and not timeout:
                 timeout = self.timeout
             elif not self.timeout and not timeout:
@@ -124,6 +125,7 @@ class RPCResponseFuture(object):
 
             key = uuid.uuid4()
             self.wait_callback = yield gen.Callback(key)
+            self.wait_callback = stack_context.wrap(self.wait_callback)
 
             logger.info('Response has not been received yet.  Adding '
                         'timeout to the io_loop in case the response '
@@ -131,7 +133,8 @@ class RPCResponseFuture(object):
 
             if isinstance(timeout, numbers.Real):
                 timeout = timedelta(seconds=timeout)
-            self.io_loop.add_timeout(timeout, self.timeout_callback)
+            self.io_loop.add_timeout(timeout, 
+                                     stack_context.wrap(self.timeout_callback))
 
             logger.info('Waiting for the response.')
             yield gen.Wait(key)
@@ -246,6 +249,7 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
         if not self.rpc_queue:
             logger.info('Adding callback to list of callbacks '
                         'waiting for the RPC queue to be open.')
+            callback = stack_context.wrap(callback)
             self.rpc_queue_callbacks.append(callback)
 
             logger.info('Calling rpc_queue_declare().')
@@ -273,6 +277,8 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
 
         '''
 
+        callback = stack_context.wrap(callback)
+
         yield Task(self.ensure_connection)
         yield Task(self.ensure_rpc_queue)
         
@@ -296,8 +302,8 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
         self.futures[correlation_id] = future
 
         timeout_callback = partial(self.rpc_timeout_callback, correlation_id)
-        self.io_loop.add_timeout(timedelta(minutes=1),
-                                 stack_context.wrap(timeout_callback))
+        timeout_callback = stack_context.wrap(timeout_callback)
+        self.io_loop.add_timeout(timedelta(seconds=8), timeout_callback)
 
         callback(future)
 
@@ -323,10 +329,11 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
         logger.info('RPC response consumed')
         cid = header.correlation_id
 
-        response = RPCResponse(channel, method, header, body)
         try:
             future = self.futures.pop(cid)
-            future.response_callback(response)
+            response = RPCResponse(channel, method, header, body)
+            cb = partial(future.response_callback, response)
+            self.io_loop.add_callback(cb)
         except KeyError:
             logger.warning('AsyncRabbitClient.consume_message received an '
                            'unrecognized correlation_id: %s.  Maybe the '
