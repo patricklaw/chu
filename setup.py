@@ -18,8 +18,10 @@
 #
 
 from setuptools import setup
+import os
+setup_path = os.path.dirname(__file__)
 
-VERSION = '0.0.1'
+VERSION = open(os.path.join(setup_path, 'VERSION')).read().strip()
 DESCRIPTION = 'Tornado Rabbit clients built on Pika'
 
 setup(
