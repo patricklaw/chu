@@ -38,7 +38,8 @@ logger = logging.getLogger(__name__)
 class Worker(Thread):
     rabbit_host = 'localhost'
 
-    def __init__(self, exchange, bindings=[], event_io_loop=None, *args, **kwargs):
+    def __init__(self, exchange, bindings=[], event_io_loop=None,
+                 *args, **kwargs):
         super(Worker, self).__init__(*args, **kwargs)
         self.daemon = True
         self.exchange = exchange

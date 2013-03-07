@@ -21,6 +21,7 @@ import pika
 from pika.adapters import TornadoConnection
 import uuid
 from threading import Lock
+from functools import partial
 
 from tornado import gen
 from tornado.gen import Task, Callback, Wait
@@ -132,10 +133,10 @@ class AsyncRabbitConnectionBase(object):
             callback()
 
     def on_backpressure(self):
-        logger.info('AsyncRabbitClient.on_backpressure: backpressure!')
+        logger.warning('AsyncRabbitClient.on_backpressure: backpressure!')
     
     def on_closed(self, connection):
-        logger.info('AsyncRabbitClient.on_close: closed!')
+        pass
     
     @gen.engine
     def queue_declare(self, callback, **kwargs):
@@ -164,10 +165,11 @@ class AsyncRabbitConnectionBase(object):
         callback(frame)
 
     @gen.engine
-    def basic_consume(self, queue, consumer_callback=None, no_ack=True, callback=None):
+    def basic_consume(self, queue,
+                      consumer_callback=None, no_ack=True, callback=None):
         logger.info('Beginning basic_consume.')
         if not consumer_callback:
-            consumer_callback = self.consume_message
+            consumer_callback = stack_context.wrap(self.consume_message)
         yield Task(self.ensure_connection)
 
         self.channel.basic_consume(queue=queue,

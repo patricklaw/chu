@@ -17,9 +17,10 @@
 # limitations under the License.
 #
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 from functools import partial
 from threading import Lock
+from weakref import WeakValueDictionary
 import numbers
 import uuid
 
@@ -92,6 +93,10 @@ class RPCResponseFuture(object):
         if not self.io_loop:
             self.io_loop = IOLoop.instance()
 
+        self.init_time = datetime.now()
+        self.get_time = None
+        self.timeout_time = None
+
     @gen.engine
     def get(self, callback, timeout=None):
         '''
@@ -111,6 +116,8 @@ class RPCResponseFuture(object):
             object.  If it is a number, it will be treated as
             seconds.
         '''
+
+        self.get_time = datetime.now()
 
         if self.response_received:
             logger.info('Response has already been received, return '
@@ -152,6 +159,8 @@ class RPCResponseFuture(object):
         logger.info('Response callback called.')
         self.response_received = True
         self.response = response
+        logger.info('Time between init and response: %s'
+                    % (datetime.now() - self.init_time))
         if self.wait_callback:
             logger.info('The wait callback has been constructed, '
                         'the user is blocking on the response.')
@@ -161,9 +170,12 @@ class RPCResponseFuture(object):
                         'the user has not called get() yet.')
 
     def timeout_callback(self):
+        self.timeout_time = datetime.now()
         if not self.response_received:
-            logger.error('The response timeout was called before the '
-                         'response was received.')
+            logger.error('The response timeout was called before the'
+                         ' response was received. cid: %s.  Difference'
+                         ' between init and timeout time was: %s'
+                         % (self.cid, self.timeout_time - self.init_time))
             self.timed_out = True
             self.wait_callback()
         else:
@@ -205,8 +217,6 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
     """
 
     def __init__(self, *args, **kwargs):
-        self.rpc_timeout = kwargs.pop('rpc_timeout', 5)
-
         self.declare_rpc_queue_lock = Lock()
         
         self.connection_open_callbacks = []
@@ -214,9 +224,13 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
         
         self.rpc_queue = None
         
-        self.futures = {}
+        self.futures = WeakValueDictionary()
 
         super(AsyncTornadoRPCClient, self).__init__(*args, **kwargs)
+
+    def on_closed(self, connection):
+        logger.warning('AsyncRabbitClient.on_close: closed!')
+        self.rpc_queue = None
 
     @gen.engine
     def rpc_queue_declare(self, callback, **kwargs):
@@ -229,7 +243,8 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
 
         try:
             self.rpc_queue = yield gen.Task(self.queue_declare,
-                                            exclusive=True)
+                                            exclusive=True,
+                                            auto_delete=True)
             yield gen.Task(self.basic_consume, queue=self.rpc_queue)
 
             logger.info('Adding callbacks that are waiting for an RPC '
@@ -260,16 +275,6 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
             rpc_queue = yield gen.Task(self.rpc_queue_declare)
             logger.info('rpc_queue_declare has been called.')
 
-    
-    def rpc_timeout_callback(self, correlation_id):
-        logger.info('RPC Client timeout callback called.')
-        if correlation_id in self.futures:
-            logger.warning('AsyncTornadoRPCClient.rpc_timeout_callback: '
-                           'Future with correlation_id %s was still present '
-                           'when the timeout was triggered.'
-                           % correlation_id)
-        self.futures.pop(correlation_id, None)
-
     @gen.engine
     def rpc(self, rpc_request, properties=None, callback=None):
         '''
@@ -291,6 +296,7 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
         
         logger.info('Publishing RPC request with key: %s' %
                     rpc_request.routing_key)
+
         self.channel.basic_publish(exchange=rpc_request.exchange,
                                    routing_key=rpc_request.routing_key,
                                    body=rpc_request.json_params,
@@ -302,10 +308,6 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
                                    timeout=rpc_request.timeout,
                                    io_loop=self.io_loop)
         self.futures[correlation_id] = future
-
-        timeout_callback = partial(self.rpc_timeout_callback, correlation_id)
-        timeout_callback = stack_context.wrap(timeout_callback)
-        self.io_loop.add_timeout(timedelta(seconds=8), timeout_callback)
 
         callback(future)
 
@@ -337,8 +339,7 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
             cb = partial(future.response_callback, response)
             self.io_loop.add_callback(cb)
         except KeyError:
-            logger.warning('AsyncRabbitClient.consume_message received an '
-                           'unrecognized correlation_id: %s.  Maybe the '
-                           'RPC took too long and was timed out, or maybe '
-                           'the response was sent more than once.' % cid)
-
+            logger.warning('AsyncRabbitClient.consume_message received an'
+                           ' unrecognized correlation_id: %s.  Maybe the'
+                           ' RPC took too long and was timed out, or maybe'
+                           ' the response was sent more than once.' % cid)
