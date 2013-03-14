@@ -1,5 +1,7 @@
 include .gitignore
 include README.md
+include VERSION
+include LICENSE
 recursive-include chu *.py
 recursive-include docs *
 prune docs/_*
