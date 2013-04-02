@@ -148,6 +148,55 @@ class TestRPCClientWorkerEmptyReply(AsyncTestCase):
         self.stop()
 
 
+class WorkerDoubleReply(Worker):
+    def handle_request(self, channel, method, properties, body):
+        props = BasicProperties(correlation_id=properties.correlation_id)
+        reply_body = json.dumps({'my': 'BODY'})
+
+        # Note that we don't provide an exchange here because the routing key
+        # is setup as a "direct" key for RPC.
+        time.sleep(1)
+        channel.basic_publish(exchange='',
+                              routing_key=properties.reply_to,
+                              properties=props,
+                              body=reply_body)
+
+        channel.basic_publish(exchange='',
+                              routing_key=properties.reply_to,
+                              properties=props,
+                              body=reply_body)
+
+        # Acknowledge the message was received and processed
+        channel.basic_ack(method.delivery_tag)
+
+class TestRPCClientWorkerDoubleReply(AsyncTestCase):
+    @gen_wrapper(timeout=10)
+    def test_call_double_reply(self):
+        client = AsyncTornadoRPCClient('localhost',
+                                       self.io_loop)
+
+        rpc_request = RPCRequest(exchange='exch',
+                                 routing_key='key',
+                                 params=dict(ncc=1701))
+        
+        worker = WorkerDoubleReply(exchange='exch',
+                                   bindings=['key'],
+                                   event_io_loop=self.io_loop)
+        worker.start()
+
+        listening = yield gen.Task(worker.listening.wait, timeout=5)
+        self.assertTrue(listening)
+
+        future = yield gen.Task(client.rpc, rpc_request)
+        response = yield gen.Task(future.get)
+
+        # time.sleep(2)
+
+        print response
+
+        self.stop()
+
+
 class WorkerConfirmMessage(Worker):
     def __init__(self, *args, **kwargs):
         super(WorkerConfirmMessage, self).__init__(*args, **kwargs)
