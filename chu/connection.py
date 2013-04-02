@@ -60,7 +60,8 @@ class AsyncRabbitConnectionBase(object):
         logger.info('Ensuring that the connection is open.')
         if not (self.connection
                 and self.connection.is_open
-                and self.channel):
+                and self.channel
+                and self.channel.is_open):
             logger.info('Adding callback to list of callbacks '
                         'waiting for the connection to be open.')
             self.connection_open_callbacks.append(callback)
@@ -112,8 +113,10 @@ class AsyncRabbitConnectionBase(object):
             logger.info('Adding callbacks to warn us when the connection '
                         'has been closed and when backpressure is being '
                         'applied.')
-            self.connection.add_on_close_callback(self.on_closed)
+            self.connection.add_on_close_callback(self.on_connection_closed)
             self.connection.add_backpressure_callback(self.on_backpressure)
+
+            self.channel.add_on_close_callback(self.on_channel_closed)
 
             logger.info('Adding callbacks that are waiting for an open '
                         'connection to the tornado queue.')
@@ -135,7 +138,10 @@ class AsyncRabbitConnectionBase(object):
     def on_backpressure(self):
         logger.warning('AsyncRabbitClient.on_backpressure: backpressure!')
     
-    def on_closed(self, connection):
+    def on_connection_closed(self, connection):
+        pass
+    
+    def on_channel_closed(self, *args, **kwargs):
         pass
     
     @gen.engine
