@@ -72,6 +72,12 @@ class RPCRequest(object):
             self._hash = hash((routing_key_hash, params_hash))
         return self._hash
 
+    def __repr__(self):
+        return ("<chu.rpc.RPCRequest:"
+                " (exchange: %s, routing_key: %s, params: %s, hash: %s)>" %
+                (self.exchange, self.routing_key,
+                 self.json_params, hash(self)))
+
 class RPCResponseFuture(object):
     '''
     A convenience object for using :class:`AsyncTornadoRPCClient` in a
@@ -132,7 +138,6 @@ class RPCResponseFuture(object):
 
             key = uuid.uuid4()
             self.wait_callback = yield gen.Callback(key)
-            self.wait_callback = stack_context.wrap(self.wait_callback)
 
             logger.info('Response has not been received yet.  Adding '
                         'timeout to the io_loop in case the response '
@@ -140,8 +145,9 @@ class RPCResponseFuture(object):
 
             if isinstance(timeout, numbers.Real):
                 timeout = timedelta(seconds=timeout)
-            self.io_loop.add_timeout(timeout, 
-                                     stack_context.wrap(self.timeout_callback))
+
+            timeout_callback = stack_context.wrap(self.timeout_callback)
+            self.io_loop.add_timeout(timeout, timeout_callback)
 
             logger.info('Waiting for the response.')
             yield gen.Wait(key)
@@ -343,3 +349,4 @@ class AsyncTornadoRPCClient(AsyncRabbitConnectionBase):
                            ' unrecognized correlation_id: %s.  Maybe the'
                            ' RPC took too long and was timed out, or maybe'
                            ' the response was sent more than once.' % cid)
+
