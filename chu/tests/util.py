@@ -52,6 +52,29 @@ def gen_wrapper(*args, **kwargs):
         return get_wrapper(args[0])
 
 
+class Sleep(gen.YieldPoint):
+    def __init__(self, length, *args, **kwargs):
+        self.io_loop = kwargs.pop('io_loop', IOLoop.current())
+        if isinstance(length, numbers.Real):
+            length = timedelta(seconds=length)
+        self.length = length
+        self.started_at = datetime.now()
+        super(Sleep, self).__init__(*args, **kwargs)
+
+    def start(self, runner):
+        self.runner = runner
+        self.key = object()
+        runner.register_callback(self.key)
+        cb = runner.result_callback(self.key)
+        self.io_loop.add_timeout(self.length, cb)
+
+    def is_ready(self):
+        return self.runner.is_ready(self.key)
+
+    def get_result(self):
+        return self.runner.pop_result(self.key)
+
+
 class AsyncEvent(object):
     def __init__(self, timeout=None, io_loop=None):
         self.is_set = False
