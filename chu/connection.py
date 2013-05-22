@@ -187,11 +187,11 @@ class AsyncRabbitConnectionBase(object):
         pass
 
     @gen.engine
-    def basic_publish(self, exchange, routing_key, body):
+    def basic_publish(self, exchange, routing_key, body, callback=None):
         logger.info('Beginning basic_publish.')
         yield Task(self.ensure_connection)
 
-        self.channel.basic_publish(exchange='email', 
+        self.channel.basic_publish(exchange=exchange, 
                                    routing_key=routing_key, 
-                                   body=message)
+                                   body=body)
         callback()
